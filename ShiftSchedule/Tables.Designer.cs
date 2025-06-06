@@ -1,6 +1,6 @@
 ﻿namespace ShiftSchedule
 {
-    partial class Form1
+    partial class Tables
     {
         /// <summary>
         /// Обязательная переменная конструктора.
@@ -35,6 +35,9 @@
             this.label1 = new System.Windows.Forms.Label();
             this.cmdChooseTable = new System.Windows.Forms.ComboBox();
             this.dataGridView1 = new System.Windows.Forms.DataGridView();
+            this.addRecordButton = new System.Windows.Forms.Button();
+            this.editRecordButton = new System.Windows.Forms.Button();
+            this.deleteRecordButton = new System.Windows.Forms.Button();
             this.menuStrip1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).BeginInit();
             this.SuspendLayout();
@@ -46,7 +49,7 @@
             this.менюToolStripMenuItem});
             this.menuStrip1.Location = new System.Drawing.Point(0, 0);
             this.menuStrip1.Name = "menuStrip1";
-            this.menuStrip1.Size = new System.Drawing.Size(800, 30);
+            this.menuStrip1.Size = new System.Drawing.Size(1137, 30);
             this.menuStrip1.TabIndex = 0;
             this.menuStrip1.Text = "menuStrip1";
             // 
@@ -101,20 +104,53 @@
             this.dataGridView1.Name = "dataGridView1";
             this.dataGridView1.RowHeadersWidth = 51;
             this.dataGridView1.RowTemplate.Height = 24;
-            this.dataGridView1.Size = new System.Drawing.Size(744, 349);
+            this.dataGridView1.Size = new System.Drawing.Size(920, 399);
             this.dataGridView1.TabIndex = 3;
             // 
-            // Form1
+            // addRecordButton
+            // 
+            this.addRecordButton.Location = new System.Drawing.Point(957, 94);
+            this.addRecordButton.Name = "addRecordButton";
+            this.addRecordButton.Size = new System.Drawing.Size(168, 45);
+            this.addRecordButton.TabIndex = 4;
+            this.addRecordButton.Text = "Добавить";
+            this.addRecordButton.UseVisualStyleBackColor = true;
+            this.addRecordButton.Click += new System.EventHandler(this.addRecordButton_Click);
+            // 
+            // editRecordButton
+            // 
+            this.editRecordButton.Location = new System.Drawing.Point(957, 145);
+            this.editRecordButton.Name = "editRecordButton";
+            this.editRecordButton.Size = new System.Drawing.Size(168, 45);
+            this.editRecordButton.TabIndex = 5;
+            this.editRecordButton.Text = "Редактировать";
+            this.editRecordButton.UseVisualStyleBackColor = true;
+            this.editRecordButton.Click += new System.EventHandler(this.editRecordButton_Click);
+            // 
+            // deleteRecordButton
+            // 
+            this.deleteRecordButton.Location = new System.Drawing.Point(957, 196);
+            this.deleteRecordButton.Name = "deleteRecordButton";
+            this.deleteRecordButton.Size = new System.Drawing.Size(168, 45);
+            this.deleteRecordButton.TabIndex = 6;
+            this.deleteRecordButton.Text = "Удалить";
+            this.deleteRecordButton.UseVisualStyleBackColor = true;
+            this.deleteRecordButton.Click += new System.EventHandler(this.deleteRecordButton_Click);
+            // 
+            // Tables
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(800, 450);
+            this.ClientSize = new System.Drawing.Size(1137, 505);
+            this.Controls.Add(this.deleteRecordButton);
+            this.Controls.Add(this.editRecordButton);
+            this.Controls.Add(this.addRecordButton);
             this.Controls.Add(this.dataGridView1);
             this.Controls.Add(this.cmdChooseTable);
             this.Controls.Add(this.label1);
             this.Controls.Add(this.menuStrip1);
             this.MainMenuStrip = this.menuStrip1;
-            this.Name = "Form1";
+            this.Name = "Tables";
             this.Text = "График смены";
             this.Load += new System.EventHandler(this.Form1_Load);
             this.menuStrip1.ResumeLayout(false);
@@ -134,6 +170,9 @@
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.ComboBox cmdChooseTable;
         private System.Windows.Forms.DataGridView dataGridView1;
+        private System.Windows.Forms.Button addRecordButton;
+        private System.Windows.Forms.Button editRecordButton;
+        private System.Windows.Forms.Button deleteRecordButton;
     }
 }
 

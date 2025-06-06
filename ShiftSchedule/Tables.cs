@@ -13,15 +13,17 @@ using System.Windows.Forms;
 namespace ShiftSchedule
 {
     // Класс главной формы приложения
-    public partial class Form1 : Form
+    public partial class Tables : Form
     {
         // Поля класса для хранения состояния приложения
         private string selectedDatabasePath;  // Путь к выбранной базе данных
         private OleDbConnection connection;   // Подключение к базе данных
         private DataTable tablesSchema;      // Схема таблиц базы данных
-        public Form1()
+        private BusinessLogic _businessLogic;
+        public Tables()
         {
             InitializeComponent(); // Инициализация компонентов формы
+            _businessLogic = null;
         }
         /// <summary>
         /// Обработчик нажатия пункта меню "Подключиться к БД"
@@ -55,7 +57,8 @@ namespace ShiftSchedule
             {
                 // Сохраняем путь к БД
                 selectedDatabasePath = openFileDialog.FileName;
-
+                _businessLogic = new BusinessLogic(openFileDialog.FileName);
+                
                 // Вызов метода для установки соединения
                 подключитьсяКБДToolStripMenuItem_Click_AfterSelection();
             }
@@ -127,11 +130,15 @@ namespace ShiftSchedule
 
                 // активируем ComboBox
                 cmdChooseTable.Enabled = true;
+                addRecordButton.Enabled = true;
+                editRecordButton.Enabled = true;
+                deleteRecordButton.Enabled = true;
             }
             // Обработка ошибки подключения
             catch (Exception ex)
             {
-                MessageBox.Show("Ошибка подключения: " + ex.Message, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Ошибка подключения: " + ex.Message,
+                    "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
             {
@@ -192,7 +199,8 @@ namespace ShiftSchedule
             // Обработчик ошибок
             catch (Exception ex)
             {
-                MessageBox.Show("Ошибка загрузки данных: " + ex.Message, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Ошибка загрузки данных: " + ex.Message, "Ошибка",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
             {
@@ -209,14 +217,111 @@ namespace ShiftSchedule
         /// </summary>
         private void Form1_Load(object sender, EventArgs e)
         {
-            // отключение ComboBox
+            // отключение кнопок
             cmdChooseTable.Enabled = false;
+            addRecordButton.Enabled = false;
+            editRecordButton.Enabled = false;
+            deleteRecordButton.Enabled = false;
 
             // Настройка DataGridView
             dataGridView1.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             dataGridView1.AllowUserToAddRows = false;
             dataGridView1.AllowUserToDeleteRows = false;
             dataGridView1.ReadOnly = true;
+        }
+        /// <summary>
+        /// Обработчик события нажатия кнопки "Добавить"
+        /// </summary>
+        private void addRecordButton_Click(object sender, EventArgs e)
+        {
+            // Проверяем, выбрана ли таблица в выпадающем списке
+            if (cmdChooseTable.SelectedItem == null)
+            {
+                MessageBox.Show("Выберите таблицу", "Выберите таблицу",
+                    MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+                return;
+            }
+            // Создаем форму для добавления записи, передавая выбранную таблицу и экземпляр BusinessLogic
+            var addForm = new AddRecord(cmdChooseTable.SelectedItem.ToString(), _businessLogic);
+            if (addForm.ShowDialog() == DialogResult.OK)
+            {
+                RefreshData(); // Обновляем DataGridView
+            }
+        }
+        /// <summary>
+        /// Метод для обновления данных в DataGridView
+        /// </summary>
+        private void RefreshData()
+        {
+            if (cmdChooseTable.SelectedItem == null) return;
+
+            try
+            {
+                string tableName = cmdChooseTable.SelectedItem.ToString();
+                dataGridView1.DataSource = _businessLogic.GetTableData(tableName);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка обновления: {ex.Message}");
+            }
+        }
+        /// <summary>
+        /// Обработчик события нажатия кнопки "Редактировать"
+        /// </summary>
+        private void editRecordButton_Click(object sender, EventArgs e)
+        {
+            // Проверяем, выбрана ли строка в DataGridView
+            if (dataGridView1.SelectedRows.Count == 0) return;
+            // Получаем выбранную строку
+            var selectedRow = dataGridView1.SelectedRows[0];
+            string tableName = cmdChooseTable.SelectedItem.ToString();
+
+            // Получаем данные выбранной строки
+            var values = new Dictionary<string, object>();
+            foreach (DataGridViewCell cell in selectedRow.Cells)
+            {
+                string columnName = dataGridView1.Columns[cell.ColumnIndex].Name;
+                values[columnName] = cell.Value;
+            }
+
+            // Создаем форму редактирования
+            var editForm = new EditRecord(tableName, _businessLogic, values);
+            if (editForm.ShowDialog() == DialogResult.OK)
+            {
+                RefreshData();
+            }
+        }
+        /// <summary>
+        /// Обработчик события нажатия кнопки "Удалить"
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void deleteRecordButton_Click(object sender, EventArgs e)
+        {
+            // Проверяем, выбрана ли строка в DataGridView
+            if (dataGridView1.SelectedRows.Count == 0) return;
+            // Получаем выбранную строку
+            var selectedRow = dataGridView1.SelectedRows[0];
+            string tableName = cmdChooseTable.SelectedItem.ToString();
+            // Получаем имя столбца идентификатора для текущей таблицы
+            string idColumnName = _businessLogic.GetIdColumnName(tableName);
+            // Получаем значение идентификатора из выбранной строки
+            object idValue = selectedRow.Cells[idColumnName].Value;
+
+            if (MessageBox.Show($"Вы уверены, что хотите удалить эту запись?",
+                               "Подтверждение удаления",
+                               MessageBoxButtons.YesNo) == DialogResult.Yes)
+            {
+                try
+                {
+                    _businessLogic.DeleteRecord(tableName, idColumnName, idValue);
+                    RefreshData();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Ошибка при удалении: {ex.Message}");
+                }
+            }
         }
     }
 }
