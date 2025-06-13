@@ -133,6 +133,7 @@ namespace ShiftSchedule
                 addRecordButton.Enabled = true;
                 editRecordButton.Enabled = true;
                 deleteRecordButton.Enabled = true;
+                Reportbutton.Enabled = true;
             }
             // Обработка ошибки подключения
             catch (Exception ex)
@@ -222,6 +223,7 @@ namespace ShiftSchedule
             addRecordButton.Enabled = false;
             editRecordButton.Enabled = false;
             deleteRecordButton.Enabled = false;
+            Reportbutton.Enabled = false;
 
             // Настройка DataGridView
             dataGridView1.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
@@ -322,6 +324,12 @@ namespace ShiftSchedule
                     MessageBox.Show($"Ошибка при удалении: {ex.Message}");
                 }
             }
+        }
+
+        private void Reportbutton_Click(object sender, EventArgs e)
+        {
+            Reports reportsForm = new Reports(_businessLogic);
+            reportsForm.Show();
         }
     }
 }

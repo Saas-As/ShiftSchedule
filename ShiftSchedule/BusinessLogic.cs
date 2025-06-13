@@ -210,5 +210,9 @@ namespace ShiftSchedule
         {
             _dataAccess.UpdateRecord(tableName, values, idColumnName);
         }
+        public DataTable ExecuteCustomQuery(string query)
+        {
+            return _dataAccess.ExecuteCustomQuery(query);
+        }
     }
 }

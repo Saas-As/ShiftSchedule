@@ -224,6 +224,17 @@ namespace ShiftSchedule
                 }
             }
         }
+        public DataTable ExecuteCustomQuery(string query)
+        {
+            using (var conn = new OleDbConnection(_connectionString))
+            {
+                conn.Open();
+                var adapter = new OleDbDataAdapter(query, conn);
+                var dt = new DataTable();
+                adapter.Fill(dt);
+                return dt;
+            }
+        }
     }
 }
 
