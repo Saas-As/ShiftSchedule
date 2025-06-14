@@ -231,22 +231,26 @@ namespace ShiftSchedule
                 return null;
             }
 
+            // Форматируем даты в нужный формат
+            string fromDate = dtpFrom.Value.ToString("dd.MM.yyyy");
+            string toDate = dtpTo.Value.ToString("dd.MM.yyyy");
+
             string query = $@"SELECT 
-                            s.[Код смены], 
-                            s.[Дата],
-                            p.[Подразделение],
-                            r.[ФИО_руководителя],
-                            n.[ФИО_начальника_смены],
-                            k.[Количество рабочих],
-                            d.[Длительность смены]
-                            FROM (((([Смены] s
-                            LEFT JOIN [Подразделения] p ON s.[ID_подразделения] = p.[ID_подразделения])
-                            LEFT JOIN [Руководители] r ON s.[ID_руководителя] = r.[ID_руководителя])
-                            LEFT JOIN [Начальники смен] n ON s.[ID_начальника_смены] = n.[ID_начальника_смены])
-                            LEFT JOIN [Количество рабочих] k ON s.[ID_количества_рабочих] = k.[ID_количества_рабочих])
-                            LEFT JOIN [Длительности смен] d ON s.[ID_длительности_смены] = d.[ID_длительности_смены]
-                            WHERE FORMAT(s.[Дата], 'dd.MM.yyyy') BETWEEN '{dtpFrom.Value:dd.MM.yyyy}' AND '{dtpTo.Value:dd.MM.yyyy}'
-                            ORDER BY s.[Дата]";
+                    s.[Код смены], 
+                    s.[Дата],
+                    p.[Подразделение],
+                    r.[ФИО_руководителя],
+                    n.[ФИО_начальника_смены],
+                    k.[Количество рабочих],
+                    d.[Длительность смены]
+                    FROM (((([Смены] s
+                    LEFT JOIN [Подразделения] p ON s.[ID_подразделения] = p.[ID_подразделения])
+                    LEFT JOIN [Руководители] r ON s.[ID_руководителя] = r.[ID_руководителя])
+                    LEFT JOIN [Начальники смен] n ON s.[ID_начальника_смены] = n.[ID_начальника_смены])
+                    LEFT JOIN [Количество рабочих] k ON s.[ID_количества_рабочих] = k.[ID_количества_рабочих])
+                    LEFT JOIN [Длительности смен] d ON s.[ID_длительности_смены] = d.[ID_длительности_смены]
+                    WHERE s.[Дата] BETWEEN CDate('{fromDate}') AND CDate('{toDate}')
+                    ORDER BY s.[Дата]";
 
             return _businessLogic.ExecuteCustomQuery(query);
         }
