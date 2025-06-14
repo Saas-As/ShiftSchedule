@@ -37,7 +37,7 @@ namespace ShiftSchedule
             // получение схемы таблицы из DataAccess
             var schema = _dataAccess.GetTableSchema(tableName);
 
-            // фильтрация системных таблиц
+            // фильтрация системных таблиц и таблицы Users
             var filteredTable = schema.Clone();
             foreach (DataRow row in schema.Rows)
             {
@@ -213,6 +213,10 @@ namespace ShiftSchedule
         public DataTable ExecuteCustomQuery(string query)
         {
             return _dataAccess.ExecuteCustomQuery(query);
+        }
+        public DataTable GetVisibleTables()
+        {
+            return _dataAccess.GetVisibleTables();
         }
     }
 }

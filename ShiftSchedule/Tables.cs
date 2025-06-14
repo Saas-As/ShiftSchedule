@@ -24,6 +24,13 @@ namespace ShiftSchedule
         {
             InitializeComponent(); // Инициализация компонентов формы
             _businessLogic = null;
+
+            // Добавляем обработчик закрытия формы
+            this.FormClosing += Tables_FormClosing;
+        }
+        private void Tables_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            connection?.Close();
         }
         /// <summary>
         /// Обработчик нажатия пункта меню "Подключиться к БД"
@@ -100,6 +107,9 @@ namespace ShiftSchedule
             // создаем подключение к базе данных
             connection = new OleDbConnection(connectionString);
 
+            var loginForm = new LoginForm(selectedDatabasePath);
+            loginForm.ShowDialog();
+
             // Вызов метода загрузки списка таблиц
             LoadTableNames();
         }
@@ -118,11 +128,9 @@ namespace ShiftSchedule
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
 
                 // Схема таблиц из БД
-                tablesSchema = connection.GetOleDbSchemaTable(OleDbSchemaGuid.Tables,
-                    new object[] { null, null, null, "TABLE" });
+                var visibleTables = _businessLogic.GetVisibleTables();
 
-                // Заполнение ComboBox именами таблиц
-                foreach (DataRow row in tablesSchema.Rows)
+                foreach (DataRow row in visibleTables.Rows)
                 {
                     string tableName = row["TABLE_NAME"].ToString();
                     cmdChooseTable.Items.Add(tableName);

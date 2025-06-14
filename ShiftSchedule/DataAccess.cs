@@ -235,6 +235,30 @@ namespace ShiftSchedule
                 return dt;
             }
         }
+        public DataTable GetVisibleTables()
+        {
+            using (var conn = new OleDbConnection(_connectionString))
+            {
+                conn.Open();
+                // Получаем все таблицы
+                DataTable schema = conn.GetOleDbSchemaTable(OleDbSchemaGuid.Tables,
+                    new object[] { null, null, null, "TABLE" });
+
+                // Фильтруем
+                var filtered = schema.Clone();
+                foreach (DataRow row in schema.Rows)
+                {
+                    string name = row["TABLE_NAME"].ToString();
+                    if (!name.StartsWith("MSys") &&
+                        !name.StartsWith("~") &&
+                        !name.Equals("Users", StringComparison.OrdinalIgnoreCase))
+                    {
+                        filtered.ImportRow(row);
+                    }
+                }
+                return filtered;
+            }
+        }
     }
 }
 
