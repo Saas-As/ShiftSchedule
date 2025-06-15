@@ -10,25 +10,32 @@ using System.Windows.Forms;
 namespace ShiftSchedule
 {
     /// <summary>
-    /// Класс BusinessLogic отвечает за реализацию бизнес-логики приложения.
-    /// Он взаимодействует с уровнем доступа к данным (DataAccess) для выполнения операций с базой данных.
-    /// Основные функции включают получение схемы таблиц, управление записями (вставка, обновление, удаление)
-    /// и валидацию данных
+    /// Класс BusinessLogic реализует бизнес-логику приложения.
+    /// Служит промежуточным слоем между пользовательским интерфейсом и уровнем доступа к данным (DataAccess).
+    /// Обеспечивает:
+    /// - Валидацию данных
+    /// - Преобразование типов
+    /// - Управление транзакциями
+    /// - Обработку бизнес-правил
+    /// - Работу с внешними ключами и связями между таблицами
     /// </summary>
     public class BusinessLogic
     {
         // Поле для хранения экземпляра класса DataAccess, который отвечает за доступ к данным.
         private readonly DataAccess _dataAccess;
         /// <summary>
+        /// Конструктор класса BusinessLogic.
         /// Инициализация объекта DataAccess с указанным путем к базе данных.
         /// </summary>
         /// <param name="databasePath">путь к выбранной БД</param>
         public BusinessLogic(string databasePath)
         {
+            // Создаем новый экземпляр DataAccess для работы с указанной БД
             _dataAccess = new DataAccess(databasePath);
         }
         /// <summary>
-        /// Метод для получения схемы таблицы из базы данных
+        /// Получает схему указанной таблицы из базы данных.
+        /// Фильтрует системные таблицы и таблицу Users.
         /// </summary>
         /// <param name="tableName">название таблицы</param>
         /// <returns>DataTable с информацией о схеме таблицы</returns>
@@ -37,8 +44,9 @@ namespace ShiftSchedule
             // получение схемы таблицы из DataAccess
             var schema = _dataAccess.GetTableSchema(tableName);
 
-            // фильтрация системных таблиц и таблицы Users
+            // Создаем копию структуры schema для фильтрации
             var filteredTable = schema.Clone();
+            // Фильтруем системные таблицы (начинающиеся с MSys или ~)
             foreach (DataRow row in schema.Rows)
             {
                 string table = row["TABLE_NAME"].ToString();
@@ -51,11 +59,13 @@ namespace ShiftSchedule
             return filteredTable;
         }
         /// <summary>
-        ///  Метод для получения имени столбца, который является идентификатором записи в таблице
+        /// Определяет имя столбца с первичным ключом для указанной таблицы.
+        /// Использует предопределенный словарь для известных таблиц.
+        /// Для остальных таблиц ищет столбец, содержащий "ID" в названии.
         /// </summary>
         /// <param name="tableName">имя таблицы</param>
-        /// <returns>имя таблицы с ID</returns>
-        /// <exception cref="Exception">Ошибка</exception>
+        /// <returns>имя столбца с первичным ключом</returns>
+        /// <exception cref="Exception">Если не удается определить ID-столбец</exception>
         public string GetIdColumnName(string tableName)
         {   
             // Словарь соответствий таблиц и их ID-полей
@@ -89,10 +99,11 @@ namespace ShiftSchedule
             throw new Exception($"Не удалось определить поле ID для таблицы {tableName}");
         }
         /// <summary>
-        /// Метод для получения следующего идентификатора для таблицы
+        /// Получает следующий доступный ID для новой записи в указанной таблице.
+        /// Вычисляет как максимальный существующий ID + 1.
         /// </summary>
-        /// <param name="tableName">название таблицы</param>
-        /// <returns>следующий ID таблицы</returns>
+        /// <param name="tableName">Имя таблицы</param>
+        /// <returns>Следующий доступный ID</returns>
         public int GetNextId(string tableName)
         {
             // Получаем имя столбца идентификатора
@@ -122,6 +133,7 @@ namespace ShiftSchedule
         /// <returns>DataTable с данными из таблицы</returns>
         public DataTable GetTableData(string tableName)
         {
+            // Делегируем запрос к DataAccess
             return _dataAccess.GetTableData(tableName);
         }
         /// <summary>
@@ -131,28 +143,35 @@ namespace ShiftSchedule
         /// <param name="values">словарь с данными для вставки</param>
         public void InsertRecord(string tableName, Dictionary<string, object> values)
         {
-            // валидация
+            // Валидируем данные перед вставкой
             ValidateData(tableName, values);
-            // вставка
+
+            // Делегируем вставку DataAccess
             _dataAccess.InsertRecord(tableName, values);
         }
         /// <summary>
-        /// метод для валидации данных
+        /// Валидирует данные перед вставкой или обновлением.
+        /// Проверяет соответствие типов данных и бизнес-правила.
         /// </summary>
         /// <param name="tableName">имя таблицы</param>
         /// <param name="values">словарь с данными для валидации</param>
         private void ValidateData(string tableName, Dictionary<string, object> values)
         {
+            // Получаем схему таблицы для проверки
             var schema = _dataAccess.GetTableSchema(tableName);
 
+            // Проверяем каждое поле в словаре значений
             foreach (var field in values)
             {
+                // Ищем описание столбца в схеме таблицы
                 var column = schema.Rows.Cast<DataRow>()
                     .FirstOrDefault(r => r["COLUMN_NAME"].ToString().Equals(field.Key, StringComparison.OrdinalIgnoreCase));
 
+                // Если столбец не найден - ошибка
                 if (column == null)
                     throw new ArgumentException($"Поле {field.Key} не существует в таблице {tableName}");
 
+                // Получаем ожидаемый тип данных для столбца
                 var expectedType = GetDotNetType((OleDbType)column["DATA_TYPE"]);
 
                 // Специальная обработка для полей времени в "Длительности смен"
@@ -166,14 +185,17 @@ namespace ShiftSchedule
                             $"Неверный тип данных для поля {field.Key}. Ожидается: DateTime, получено: {field.Value?.GetType().Name ?? "null"}");
                 }
 
+                // Если значение не null, проверяем его тип
                 if (field.Value != null)
                 {
+                    // Специальная обработка для decimal -> int
                     if (expectedType == typeof(int) && field.Value is decimal)
                     {
                         values[field.Key] = Convert.ToInt32(field.Value);
                         continue;
                     }
 
+                    // Проверяем соответствие типов
                     if (field.Value.GetType() != expectedType)
                     {
                         throw new ArgumentException(
@@ -189,14 +211,15 @@ namespace ShiftSchedule
         /// <returns>тип данных .NET</returns>
         private Type GetDotNetType(OleDbType oleDbType)
         {
+            // Сопоставление типов OleDb и .NET
             return oleDbType switch
             {
-                OleDbType.Integer => typeof(int),
-                OleDbType.Decimal => typeof(decimal),
-                OleDbType.Currency => typeof(decimal),
-                OleDbType.Date => typeof(DateTime),
-                OleDbType.Boolean => typeof(bool),
-                _ => typeof(string)
+                OleDbType.Integer => typeof(int),       // Целое число
+                OleDbType.Decimal => typeof(decimal),   // Десятичное число
+                OleDbType.Currency => typeof(decimal),  // Денежный тип
+                OleDbType.Date => typeof(DateTime),     // Дата/время
+                OleDbType.Boolean => typeof(bool),      // Логический тип
+                _ => typeof(string)                     // По умолчанию - строка
             };
         }
         /// <summary>
@@ -207,6 +230,7 @@ namespace ShiftSchedule
         /// <param name="idValue">значение ID</param>
         public void DeleteRecord(string tableName, string idColumnName, object idValue)
         {
+            // Делегируем удаление DataAccess
             _dataAccess.DeleteRecord(tableName, idColumnName, idValue);
         }
         /// <summary>
@@ -215,14 +239,17 @@ namespace ShiftSchedule
         /// <param name="tableName">имя таблицы</param>
         /// <param name="values">Словарь с данными для обновления</param>   
         /// <param name="idColumnName">имя столбца с ID</param>
+        /// <returns>True, если обновление прошло успешно</returns>
         public bool UpdateRecord(string tableName, Dictionary<string, object> values, string idColumnName)
         {
             try
             {
+                // Делегируем обновление DataAccess
                 return _dataAccess.UpdateRecord(tableName, values, idColumnName);
             }
             catch (Exception ex)
             {
+                // Обрабатываем ошибки обновления
                 MessageBox.Show($"Ошибка при обновлении записи: {ex.Message}",
                               "Ошибка",
                               MessageBoxButtons.OK,
@@ -230,19 +257,41 @@ namespace ShiftSchedule
                 return false;
             }
         }
+        /// <summary>
+        /// Выполняет произвольный SQL-запрос к базе данных.
+        /// </summary>
+        /// <param name="query">SQL-запрос</param>
+        /// <returns>DataTable с результатами запроса</returns>
         public DataTable ExecuteCustomQuery(string query)
         {
+            // Делегируем выполнение запроса DataAccess
             return _dataAccess.ExecuteCustomQuery(query);
         }
+        /// <summary>
+        /// Получает список видимых таблиц (исключая системные).
+        /// </summary>
+        /// <returns>DataTable с информацией о видимых таблицах</returns>
         public DataTable GetVisibleTables()
         {
+            // Делегируем запрос к DataAccess
             return _dataAccess.GetVisibleTables();
         }
+        /// <summary>
+        /// Получает данные для ComboBox (справочники) в формате ID - Name.
+        /// Используется для отображения связанных данных (например, подразделений).
+        /// </summary>
+        /// <param name="lookupTableName">Имя таблицы-справочника</param>
+        /// <param name="idColumn">Имя столбца с ID</param>
+        /// <param name="nameColumn">Имя столбца с отображаемым значением</param>
+        /// <returns>Словарь (ID, Name) для заполнения ComboBox</returns>
         public Dictionary<int, string> GetLookupData(string lookupTableName, string idColumn, string nameColumn)
         {
+            // Создаем словарь для результатов
             var data = new Dictionary<int, string>();
+            // Получаем данные таблицы-справочника
             var table = _dataAccess.GetTableData(lookupTableName);
 
+            // Заполняем словарь значениями из таблицы
             foreach (DataRow row in table.Rows)
             {
                 int id = Convert.ToInt32(row[idColumn]);

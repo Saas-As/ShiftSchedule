@@ -12,34 +12,43 @@ using System.Windows.Forms;
 
 namespace ShiftSchedule
 {
-    // Класс главной формы приложения
+    /// <summary>
+    /// Главная форма приложения для работы с расписанием смен.
+    /// Предоставляет интерфейс для подключения к базе данных, просмотра, 
+    /// добавления, редактирования и удаления записей, а также формирования отчетов.
+    /// </summary>
     public partial class Tables : Form
     {
         // Поля класса для хранения состояния приложения
         private string selectedDatabasePath;  // Путь к выбранной базе данных
         private OleDbConnection connection;   // Подключение к базе данных
-        private DataTable tablesSchema;      // Схема таблиц базы данных
-        private BusinessLogic _businessLogic;
+        private BusinessLogic _businessLogic; // Объект бизнес-логики для работы с данными
+
+        /// <summary>
+        /// Конструктор главной формы. Инициализирует компоненты и настраивает начальное состояние.
+        /// </summary>
         public Tables()
         {
             InitializeComponent(); // Инициализация компонентов формы
-            _businessLogic = null;
+            _businessLogic = null; // Пока не выбрана БД, бизнес-логика не инициализирована
 
             // Добавляем обработчик закрытия формы
             this.FormClosing += Tables_FormClosing;
         }
+        /// <summary>
+        /// Обработчик события закрытия формы. Закрывает соединение с БД.
+        /// </summary>
         private void Tables_FormClosing(object sender, FormClosingEventArgs e)
         {
-            connection?.Close();
+            connection?.Close(); // Если соединение открыто, закрываем его
         }
         /// <summary>
         /// Обработчик нажатия пункта меню "Подключиться к БД"
+        /// Открывает диалог выбора файла базы данных и инициализирует подключение.
         /// </summary>
-        /// <param name="sender">Источник события</param>
-        /// <param name="e">Аргументы события</param>
         private void подключитьсяКБДToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            // Путь к папке с БД
+            // Путь к папке с базами данных (относительно текущей директории)
             string databaseFolder = Path.Combine(Directory.GetCurrentDirectory(), "DataBase");
 
             // Проверка существования папки
@@ -53,10 +62,10 @@ namespace ShiftSchedule
             // Настройка диалога выбора файла
             OpenFileDialog openFileDialog = new OpenFileDialog
             {
-                InitialDirectory = databaseFolder,
-                Title = "Выберите файл базы данных Access",
-                Filter = "Базы данных Access (*.accdb; *.mdb)|*.accdb;*.mdb|Все файлы (*.*)|*.*",
-                RestoreDirectory = true
+                InitialDirectory = databaseFolder, // Начальная директория
+                Title = "Выберите файл базы данных Access", // Заголовок окна
+                Filter = "Базы данных Access (*.accdb; *.mdb)|*.accdb;*.mdb|Все файлы (*.*)|*.*", // Фильтры файлов
+                RestoreDirectory = true // Восстанавливаем предыдущую директорию при следующем открытии
             };
 
             // Показываем диалог и обрабатываем результат
@@ -64,6 +73,8 @@ namespace ShiftSchedule
             {
                 // Сохраняем путь к БД
                 selectedDatabasePath = openFileDialog.FileName;
+
+                // Инициализируем бизнес-логику с выбранной БД
                 _businessLogic = new BusinessLogic(openFileDialog.FileName);
                 
                 // Вызов метода для установки соединения
@@ -71,7 +82,8 @@ namespace ShiftSchedule
             }
         }
         /// <summary>
-        /// Метод для установки соединения
+        /// Метод для установки соединения с базой данных после выбора файла.
+        /// Вызывает форму аутентификации и загружает список таблиц.
         /// </summary>
         private void подключитьсяКБДToolStripMenuItem_Click_AfterSelection()
         {
@@ -90,7 +102,7 @@ namespace ShiftSchedule
             // Строка подключения
             string connectionString = "";
 
-            //Выбираем провайдера
+            // Выбираем провайдера в зависимости от расширения файла
             switch (extension)
             {
                 case ".accdb":
@@ -107,6 +119,7 @@ namespace ShiftSchedule
             // создаем подключение к базе данных
             connection = new OleDbConnection(connectionString);
 
+            // Показываем форму аутентификации
             var loginForm = new LoginForm(selectedDatabasePath);
             loginForm.ShowDialog();
 
@@ -114,7 +127,8 @@ namespace ShiftSchedule
             LoadTableNames();
         }
         /// <summary>
-        /// Метод загрузки списка таблиц
+        /// Метод загрузки списка таблиц из базы данных.
+        /// Заполняет выпадающий список доступными таблицами.
         /// </summary>
         private void LoadTableNames()
         {
@@ -127,16 +141,20 @@ namespace ShiftSchedule
                 MessageBox.Show("Подключение к базе данных установлено успешно!", "Успешно", 
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
 
-                // Схема таблиц из БД
+                // Получаем список видимых таблиц (исключая системные и таблицу Users)
                 var visibleTables = _businessLogic.GetVisibleTables();
 
+                // Очищаем выпадающий список перед заполнением
+                cmdChooseTable.Items.Clear();
+
+                // Заполняем выпадающий список именами таблиц
                 foreach (DataRow row in visibleTables.Rows)
                 {
                     string tableName = row["TABLE_NAME"].ToString();
                     cmdChooseTable.Items.Add(tableName);
                 }
 
-                // активируем ComboBox
+                // активируем ComboBox и кнопку отчетов
                 cmdChooseTable.Enabled = true;
                 Reportbutton.Enabled = true;
             }
@@ -181,6 +199,7 @@ namespace ShiftSchedule
         /// </summary>
         private void LoadData()
         {
+            // Активируем кнопки работы с записями
             addRecordButton.Enabled = true;
             editRecordButton.Enabled = true;
             deleteRecordButton.Enabled = true;
@@ -193,12 +212,14 @@ namespace ShiftSchedule
 
             try
             {
+                // Для таблицы "Смены" используем специальный метод с подстановкой значений
                 if (selectedTable.Equals("Смены", StringComparison.OrdinalIgnoreCase))
                 {
                     LoadShiftsDataWithNames();
                 }
                 else
                 {
+                    // Для остальных таблиц стандартная загрузка
                     connection.Open();
 
                     // Создаем SQL-запрос
@@ -222,15 +243,19 @@ namespace ShiftSchedule
             }
             finally
             {
-                // Закрытие соединения
+                // В любом случае закрываем соединение
                 if (connection.State == ConnectionState.Open)
                 {
                     connection.Close();
                 }
             }
         }
+        /// <summary>
+        /// Специальный метод для загрузки данных таблицы "Смены" с подстановкой значений из связанных таблиц.
+        /// </summary>
         private void LoadShiftsDataWithNames()
         {
+            // SQL-запрос с JOIN для получения данных из связанных таблиц
             string query = @"SELECT 
                             s.[Код смены], 
                             s.[Дата],
@@ -244,20 +269,26 @@ namespace ShiftSchedule
                             k.[Количество рабочих] AS [Количество_текст],
                             s.[ID_длительности_смены],
                             d.[Длительность смены] AS [Длительность_текст]
-                        FROM (((([Смены] s
-                        LEFT JOIN [Подразделения] p ON s.[ID_подразделения] = p.[ID_подразделения])
-                        LEFT JOIN [Руководители] r ON s.[ID_руководителя] = r.[ID_руководителя])
-                        LEFT JOIN [Начальники смен] n ON s.[ID_начальника_смены] = n.[ID_начальника_смены])
-                        LEFT JOIN [Количество рабочих] k ON s.[ID_количества_рабочих] = k.[ID_количества_рабочих])
-                        LEFT JOIN [Длительности смен] d ON s.[ID_длительности_смены] = d.[ID_длительности_смены]";
+                            FROM (((([Смены] s
+                            LEFT JOIN [Подразделения] p ON s.[ID_подразделения] = p.[ID_подразделения])
+                            LEFT JOIN [Руководители] r ON s.[ID_руководителя] = r.[ID_руководителя])
+                            LEFT JOIN [Начальники смен] n ON s.[ID_начальника_смены] = n.[ID_начальника_смены])
+                            LEFT JOIN [Количество рабочих] k ON s.[ID_количества_рабочих] = k.[ID_количества_рабочих])
+                            LEFT JOIN [Длительности смен] d ON s.[ID_длительности_смены] = d.[ID_длительности_смены]";
 
             try
             {
+                // Открытие соединения с базой данных
                 connection.Open();
+                // Создание команды с SQL-запросом и привязкой к открытому соединению
                 OleDbCommand command = new OleDbCommand(query, connection);
+                // Инициализация адаптера данных для выполнения запроса и заполнения таблицы
                 OleDbDataAdapter adapter = new OleDbDataAdapter(command);
+                // Создание структуры DataTable для хранения результатов запроса
                 DataTable dataTable = new DataTable();
+                // Заполнение DataTable данными из результата выполнения SQL-запроса
                 adapter.Fill(dataTable);
+                // Привязываем данные к DataGridView
                 dataGridView1.DataSource = dataTable;
 
                 // Скрываем технические ID-столбцы
@@ -276,6 +307,7 @@ namespace ShiftSchedule
             }
             finally
             {
+                // В любом случае закрываем соединение
                 if (connection.State == ConnectionState.Open)
                 {
                     connection.Close();
@@ -329,8 +361,19 @@ namespace ShiftSchedule
 
             try
             {
+                // Получаем имя текущей таблицы
                 string tableName = cmdChooseTable.SelectedItem.ToString();
-                dataGridView1.DataSource = _businessLogic.GetTableData(tableName);
+                // Для таблицы "Смены" используем специальный метод с JOIN
+                if (tableName.Equals("Смены", StringComparison.OrdinalIgnoreCase))
+                {
+                    LoadShiftsDataWithNames();
+                }
+                else
+                {
+                    // Для остальных таблиц стандартная загрузка
+                    dataGridView1.DataSource = _businessLogic.GetTableData(tableName);
+                }
+                ;
             }
             catch (Exception ex)
             {
@@ -339,6 +382,7 @@ namespace ShiftSchedule
         }
         /// <summary>
         /// Обработчик события нажатия кнопки "Редактировать"
+        /// Открывает форму для редактирования выбранной записи.
         /// </summary>
         private void editRecordButton_Click(object sender, EventArgs e)
         {
@@ -362,6 +406,7 @@ namespace ShiftSchedule
 
             // Создаем форму редактирования
             var editForm = new EditRecord(tableName, _businessLogic, values);
+            // Если форма закрыта с OK - обновляем данные
             if (editForm.ShowDialog() == DialogResult.OK)
             {
                 RefreshData();
@@ -369,9 +414,8 @@ namespace ShiftSchedule
         }
         /// <summary>
         /// Обработчик события нажатия кнопки "Удалить"
+        /// Удаляет выбранную запись с подтверждением.
         /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
         private void deleteRecordButton_Click(object sender, EventArgs e)
         {
             // Проверяем, выбрана ли строка в DataGridView
@@ -384,13 +428,16 @@ namespace ShiftSchedule
             // Получаем значение идентификатора из выбранной строки
             object idValue = selectedRow.Cells[idColumnName].Value;
 
+            // Запрашиваем подтверждение удаления
             if (MessageBox.Show($"Вы уверены, что хотите удалить эту запись?",
                                "Подтверждение удаления",
                                MessageBoxButtons.YesNo) == DialogResult.Yes)
             {
                 try
                 {
+                    // Вызываем удаление через бизнес-логику
                     _businessLogic.DeleteRecord(tableName, idColumnName, idValue);
+                    // Обновляем данные
                     RefreshData();
                 }
                 catch (Exception ex)
@@ -399,6 +446,10 @@ namespace ShiftSchedule
                 }
             }
         }
+        /// <summary>
+        /// Обработчик нажатия кнопки "Отчеты".
+        /// Открывает форму для формирования отчетов.
+        /// </summary>
 
         private void Reportbutton_Click(object sender, EventArgs e)
         {
