@@ -143,25 +143,34 @@ namespace ShiftSchedule
         /// <param name="values">словарь с данными для валидации</param>
         private void ValidateData(string tableName, Dictionary<string, object> values)
         {
-            // получаем схему таблицы
             var schema = _dataAccess.GetTableSchema(tableName);
 
             foreach (var field in values)
             {
-                // ищем столбец в схеме таблицы
                 var column = schema.Rows.Cast<DataRow>()
                     .FirstOrDefault(r => r["COLUMN_NAME"].ToString().Equals(field.Key, StringComparison.OrdinalIgnoreCase));
 
                 if (column == null)
                     throw new ArgumentException($"Поле {field.Key} не существует в таблице {tableName}");
 
-                // Проверка типов данных с учетом возможных преобразований
                 var expectedType = GetDotNetType((OleDbType)column["DATA_TYPE"]);
+
+                // Специальная обработка для полей времени в "Длительности смен"
+                if (tableName.Equals("Длительности смен", StringComparison.OrdinalIgnoreCase) &&
+                    (field.Key == "Начало смены" || field.Key == "Окончание смены"))
+                {
+                    if (field.Value is DateTime)
+                        continue; // Тип правильный
+                    else
+                        throw new ArgumentException(
+                            $"Неверный тип данных для поля {field.Key}. Ожидается: DateTime, получено: {field.Value?.GetType().Name ?? "null"}");
+                }
+
                 if (field.Value != null)
                 {
                     if (expectedType == typeof(int) && field.Value is decimal)
                     {
-                        values[field.Key] = Convert.ToInt32(field.Value); // Преобразуем Decimal в Int
+                        values[field.Key] = Convert.ToInt32(field.Value);
                         continue;
                     }
 
@@ -206,9 +215,20 @@ namespace ShiftSchedule
         /// <param name="tableName">имя таблицы</param>
         /// <param name="values">Словарь с данными для обновления</param>   
         /// <param name="idColumnName">имя столбца с ID</param>
-        public void UpdateRecord(string tableName, Dictionary<string, object> values, string idColumnName)
+        public bool UpdateRecord(string tableName, Dictionary<string, object> values, string idColumnName)
         {
-            _dataAccess.UpdateRecord(tableName, values, idColumnName);
+            try
+            {
+                return _dataAccess.UpdateRecord(tableName, values, idColumnName);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при обновлении записи: {ex.Message}",
+                              "Ошибка",
+                              MessageBoxButtons.OK,
+                              MessageBoxIcon.Error);
+                return false;
+            }
         }
         public DataTable ExecuteCustomQuery(string query)
         {
@@ -217,6 +237,20 @@ namespace ShiftSchedule
         public DataTable GetVisibleTables()
         {
             return _dataAccess.GetVisibleTables();
+        }
+        public Dictionary<int, string> GetLookupData(string lookupTableName, string idColumn, string nameColumn)
+        {
+            var data = new Dictionary<int, string>();
+            var table = _dataAccess.GetTableData(lookupTableName);
+
+            foreach (DataRow row in table.Rows)
+            {
+                int id = Convert.ToInt32(row[idColumn]);
+                string name = row[nameColumn].ToString();
+                data.Add(id, name);
+            }
+
+            return data;
         }
     }
 }

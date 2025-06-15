@@ -152,7 +152,7 @@ namespace ShiftSchedule
                         Width = groupBox.Width - 20,
                         Minimum = 0,
                         Maximum = int.MaxValue,
-                        Value = Convert.ToDecimal(_originalValues[colName]),
+                        Value = _originalValues.ContainsKey(colName) ? Convert.ToDecimal(_originalValues[colName]) : 0,
                         ReadOnly = true,
                         BackColor = SystemColors.Control,
                         Enabled = false
@@ -162,7 +162,8 @@ namespace ShiftSchedule
                 else
                 {
                     // Обычные поля
-                    inputControl = CreateInputControl(column, groupBox, _originalValues[colName]);
+                    object initialValue = _originalValues.ContainsKey(colName) ? _originalValues[colName] : null;
+                    inputControl = CreateInputControl(column, groupBox, initialValue);
                 }
 
                 groupBox.Controls.Add(inputControl);
@@ -198,7 +199,54 @@ namespace ShiftSchedule
             string colName = column["COLUMN_NAME"].ToString();
             var dataType = (OleDbType)column["DATA_TYPE"];
 
-            Control control = dataType switch
+            if (_tableName.Equals("Смены", StringComparison.OrdinalIgnoreCase))
+            {
+                switch (colName)
+                {
+                    case "ID_подразделения":
+                        return CreateComboBoxControl(colName, parent, initialValue, "Подразделения", "ID_подразделения", "Подразделение");
+                    case "ID_руководителя":
+                        return CreateComboBoxControl(colName, parent, initialValue, "Руководители", "ID_руководителя", "ФИО_руководителя");
+                    case "ID_количества_рабочих":
+                        return CreateComboBoxControl(colName, parent, initialValue, "Количество рабочих", "ID_количества_рабочих", "Количество рабочих");
+                    case "ID_длительности_смены":
+                        return CreateComboBoxControl(colName, parent, initialValue, "Длительности смен", "ID_длительности_смены", "Длительность смены");
+                    case "ID_начальника_смены":
+                        return CreateComboBoxControl(colName, parent, initialValue, "Начальники смен", "ID_начальника_смены", "ФИО_начальника_смены");
+                }
+            }
+            // Специальная обработка для таблицы "Длительности смен"
+            if (_tableName.Equals("Длительности смен", StringComparison.OrdinalIgnoreCase))
+            {
+                switch (colName)
+                {
+                    case "Начало смены":
+                    case "Окончание смены":
+                        return new DateTimePicker
+                        {
+                            Tag = colName,
+                            Name = colName,
+                            Location = new Point(10, 25),
+                            Width = parent.Width - 20,
+                            Format = DateTimePickerFormat.Custom,
+                            CustomFormat = "HH:mm",
+                            ShowUpDown = true,
+                            Value = DateTime.Today.Date.AddHours(8) // Устанавливаем 8:00 по умолчанию
+                        };
+                    case "Длительность смены":
+                        return new NumericUpDown
+                        {
+                            Tag = colName,
+                            Name = colName,
+                            Location = new Point(10, 25),
+                            Width = parent.Width - 20,
+                            Minimum = 0,
+                            Maximum = 24
+                        };
+                }
+            }
+
+            return dataType switch
             {
                 OleDbType.Integer => new NumericUpDown
                 {
@@ -208,7 +256,7 @@ namespace ShiftSchedule
                     Width = parent.Width - 20,
                     Minimum = int.MinValue,
                     Maximum = int.MaxValue,
-                    Value = Convert.ToDecimal(initialValue)
+                    Value = initialValue != null && initialValue != DBNull.Value ? Convert.ToDecimal(initialValue) : 0
                 },
                 OleDbType.Decimal => new NumericUpDown
                 {
@@ -219,7 +267,7 @@ namespace ShiftSchedule
                     DecimalPlaces = 2,
                     Minimum = decimal.MinValue,
                     Maximum = decimal.MaxValue,
-                    Value = Convert.ToDecimal(initialValue)
+                    Value = initialValue != null && initialValue != DBNull.Value ? Convert.ToDecimal(initialValue) : 0
                 },
                 OleDbType.Date => new DateTimePicker
                 {
@@ -228,7 +276,7 @@ namespace ShiftSchedule
                     Location = new Point(10, 25),
                     Width = parent.Width - 20,
                     Format = DateTimePickerFormat.Short,
-                    Value = initialValue != DBNull.Value ? Convert.ToDateTime(initialValue) : DateTime.Today,
+                    Value = initialValue != null && initialValue != DBNull.Value ? Convert.ToDateTime(initialValue) : DateTime.Today,
                     MinDate = new DateTime(2000, 1, 1),
                     MaxDate = new DateTime(2100, 1, 1)
                 },
@@ -238,7 +286,7 @@ namespace ShiftSchedule
                     Name = colName,
                     Location = new Point(10, 25),
                     Width = parent.Width - 20,
-                    Checked = initialValue != DBNull.Value && Convert.ToBoolean(initialValue)
+                    Checked = initialValue != null && initialValue != DBNull.Value && Convert.ToBoolean(initialValue)
                 },
                 _ => new TextBox
                 {
@@ -246,11 +294,67 @@ namespace ShiftSchedule
                     Name = colName,
                     Location = new Point(10, 25),
                     Width = parent.Width - 20,
-                    Text = initialValue != DBNull.Value ? initialValue.ToString() : ""
+                    Text = initialValue != null && initialValue != DBNull.Value ? initialValue.ToString() : ""
                 }
             };
+        }
+        private ComboBox CreateComboBoxControl(string colName, GroupBox parent, object initialValue,
+                                     string lookupTable, string idColumn, string nameColumn)
+        {
+            var combo = new ComboBox
+            {
+                Tag = colName,
+                Name = colName,
+                Location = new Point(10, 25),
+                Width = parent.Width - 20,
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
 
-            return control;
+            try
+            {
+                // Получаем данные для ComboBox
+                var lookupData = _businessLogic.GetLookupData(lookupTable, idColumn, nameColumn);
+
+                // Заполняем ComboBox
+                foreach (var item in lookupData)
+                {
+                    combo.Items.Add(new KeyValuePair<int, string>(item.Key, item.Value));
+                }
+
+                // Настраиваем отображение
+                combo.DisplayMember = "Value";
+                combo.ValueMember = "Key";
+
+                // Устанавливаем выбранное значение
+                if (initialValue != null && initialValue != DBNull.Value)
+                {
+                    int initialId = Convert.ToInt32(initialValue);
+
+                    // Ищем элемент с нужным ID
+                    for (int i = 0; i < combo.Items.Count; i++)
+                    {
+                        var item = (KeyValuePair<int, string>)combo.Items[i];
+                        if (item.Key == initialId)
+                        {
+                            combo.SelectedIndex = i;
+                            break;
+                        }
+                    }
+                }
+                else if (combo.Items.Count > 0)
+                {
+                    combo.SelectedIndex = 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка загрузки данных для {colName}: {ex.Message}",
+                              "Ошибка",
+                              MessageBoxButtons.OK,
+                              MessageBoxIcon.Warning);
+            }
+
+            return combo;
         }
 
         /// <summary>
@@ -259,54 +363,75 @@ namespace ShiftSchedule
         /// </summary>
         private void BtnSave_Click(object sender, EventArgs e)
         {
-            var values = new Dictionary<string, object>();
-            var missingFields = new List<string>();
-
-            // Фильтруем только элементы управления для ввода данных
-            var inputFields = _inputControls.Where(c =>
-                c is TextBox ||
-                c is NumericUpDown ||
-                c is DateTimePicker ||
-                c is CheckBox).ToList();
-
-            foreach (var control in inputFields)
+            try
             {
-                string fieldName = control.Tag?.ToString();
-                if (string.IsNullOrEmpty(fieldName)) continue;
+                var values = new Dictionary<string, object>();
+                var missingFields = new List<string>();
+                var invalidFields = new List<string>();
 
-                bool isRequired = _businessLogic.IsFieldRequired(_tableName, fieldName);
-                object value = GetControlValue(control);
-
-                if (isRequired && IsValueEmpty(value))
+                foreach (var control in _inputControls)
                 {
-                    missingFields.Add(fieldName);
-                    control.BackColor = Color.LightPink;
+                    string fieldName = control.Tag?.ToString();
+                    if (string.IsNullOrEmpty(fieldName)) continue;
+
+                    bool isRequired = _businessLogic.IsFieldRequired(_tableName, fieldName);
+                    object value = GetControlValue(control);
+
+                    if (isRequired && IsValueEmpty(value))
+                    {
+                        missingFields.Add(fieldName);
+                        control.BackColor = Color.LightPink;
+                        continue;
+                    }
+
+                    if (!IsValueEmpty(value))
+                    {
+                        if (value is int intValue && intValue < 0)
+                        {
+                            invalidFields.Add($"{fieldName} (не может быть отрицательным)");
+                            control.BackColor = Color.LightPink;
+                            continue;
+                        }
+                    }
+
+                    values[fieldName] = value ?? DBNull.Value;
+                    control.BackColor = SystemColors.Window;
+                }
+
+                if (missingFields.Count > 0 || invalidFields.Count > 0)
+                {
+                    var errorMessage = "";
+                    if (missingFields.Count > 0)
+                        errorMessage += $"Не заполнены обязательные поля:\n{string.Join(", ", missingFields)}\n\n";
+                    if (invalidFields.Count > 0)
+                        errorMessage += $"Некорректные значения в полях:\n{string.Join(", ", invalidFields)}";
+
+                    MessageBox.Show(errorMessage, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // Добавляем ID записи для обновления
+                values[_idColumnName] = _originalValues[_idColumnName];
+
+                // Вызываем обновление
+                bool success = _businessLogic.UpdateRecord(_tableName, values, _idColumnName);
+
+                if (success)
+                {
+                    MessageBox.Show("Изменения успешно сохранены!", "Успех",
+                                  MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    this.DialogResult = DialogResult.OK;
+                    this.Close();
                 }
                 else
                 {
-                    values.Add(fieldName, value);
-                    control.BackColor = SystemColors.Window;
+                    MessageBox.Show("Не удалось сохранить изменения", "Ошибка",
+                                  MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
-            }
-
-            if (missingFields.Count > 0)
-            {
-                MessageBox.Show($"Заполните обязательные поля:\n{string.Join("\n", missingFields)}",
-                              "Ошибка",
-                              MessageBoxButtons.OK,
-                              MessageBoxIcon.Warning);
-                return;
-            }
-
-            try
-            {
-                _businessLogic.UpdateRecord(_tableName, values, _idColumnName);
-                this.DialogResult = DialogResult.OK;
-                this.Close();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Ошибка сохранения: {ex.Message}",
+                MessageBox.Show($"Ошибка при сохранении: {ex.Message}\n\n{ex.StackTrace}",
                               "Ошибка",
                               MessageBoxButtons.OK,
                               MessageBoxIcon.Error);
@@ -320,14 +445,39 @@ namespace ShiftSchedule
         /// <returns>Значение, полученное из элемента управления.</returns>
         private object GetControlValue(Control control)
         {
-            return control switch
+            switch (control)
             {
-                TextBox tb => tb.Text,
-                NumericUpDown num => Convert.ToInt32(num.Value),
-                DateTimePicker dt => dt.Value,
-                CheckBox cb => cb.Checked,
-                _ => null
-            };
+                case ComboBox cb:
+                    if (cb.SelectedItem == null) return null;
+
+                    // Для ComboBox с KeyValuePair
+                    if (cb.SelectedItem is KeyValuePair<int, string> kvp)
+                        return kvp.Key;
+
+                    // Для обычных ComboBox
+                    return cb.SelectedValue ?? cb.SelectedItem;
+
+                case TextBox tb:
+                    return tb.Text;
+
+                case NumericUpDown num:
+                    return Convert.ToInt32(num.Value);
+
+                case DateTimePicker dt:
+                    if (_tableName.Equals("Длительности смен", StringComparison.OrdinalIgnoreCase) &&
+                        (dt.Tag.ToString() == "Начало смены" || dt.Tag.ToString() == "Окончание смены"))
+                    {
+                        // Для времени возвращаем DateTime с фиксированной датой (например, 30.12.1999) и выбранным временем
+                        return new DateTime(1999, 12, 30, dt.Value.Hour, dt.Value.Minute, 0);
+                    }
+                    return dt.Value;
+
+                case CheckBox cb:
+                    return cb.Checked;
+
+                default:
+                    return null;
+            }
         }
 
         /// <summary>
@@ -337,12 +487,20 @@ namespace ShiftSchedule
         /// <returns>True, если значение пустое, иначе False.</returns>
         private bool IsValueEmpty(object value)
         {
+            if (value == null || value == DBNull.Value)
+                return true;
+
+            if (value is TimeSpan timeSpan)
+                return timeSpan == TimeSpan.Zero;
+
             return value switch
             {
                 string s => string.IsNullOrWhiteSpace(s),
+                int i => i == 0,
                 decimal d => d == 0,
                 DateTime dt => dt == DateTime.MinValue,
-                _ => value == null
+                bool _ => false, // Для CheckBox - всегда считается заполненным
+                _ => false // Для других типов по умолчанию считаем заполненным
             };
         }
     }

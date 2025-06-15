@@ -24,6 +24,7 @@ namespace ShiftSchedule
         private Button _btnCancel;
         // Элемент управления для ввода ID
         private NumericUpDown _idControl;
+        private readonly string _idColumnName;
 
         /// <summary>
         /// Конструктор класса AddRecord.
@@ -41,6 +42,7 @@ namespace ShiftSchedule
 
             _tableName = tableName;
             _businessLogic = businessLogic;
+            _idColumnName = _businessLogic.GetIdColumnName(_tableName);
 
             InitializeComponent();
             InitializeForm();
@@ -106,7 +108,6 @@ namespace ShiftSchedule
         {
             int yPos = 20;
             var schema = _businessLogic.GetTableSchema(_tableName);
-            string idColumnName = _businessLogic.GetIdColumnName(_tableName);
 
             // Создаем Panel для группировки элементов
             var panel = new Panel
@@ -136,7 +137,7 @@ namespace ShiftSchedule
                 Control inputControl;
 
                 // Для ID-поля
-                if (colName.Equals(idColumnName, StringComparison.OrdinalIgnoreCase))
+                if (colName.Equals(_idColumnName, StringComparison.OrdinalIgnoreCase))
                 {
                     _idControl = new NumericUpDown
                     {
@@ -191,6 +192,53 @@ namespace ShiftSchedule
             string colName = column["COLUMN_NAME"].ToString();
             var dataType = (OleDbType)column["DATA_TYPE"];
 
+            if (_tableName.Equals("Смены", StringComparison.OrdinalIgnoreCase))
+            {
+                switch (colName)
+                {
+                    case "ID_подразделения":
+                        return CreateComboBoxControl(colName, parent, "Подразделения", "ID_подразделения", "Подразделение");
+                    case "ID_руководителя":
+                        return CreateComboBoxControl(colName, parent, "Руководители", "ID_руководителя", "ФИО_руководителя");
+                    case "ID_количества_рабочих":
+                        return CreateComboBoxControl(colName, parent, "Количество рабочих", "ID_количества_рабочих", "Количество рабочих");
+                    case "ID_длительности_смены":
+                        return CreateComboBoxControl(colName, parent, "Длительности смен", "ID_длительности_смены", "Длительность смены");
+                    case "ID_начальника_смены":
+                        return CreateComboBoxControl(colName, parent, "Начальники смен", "ID_начальника_смены", "ФИО_начальника_смены");
+                }
+            }
+            // Специальная обработка для таблицы "Длительности смен"
+            if (_tableName.Equals("Длительности смен", StringComparison.OrdinalIgnoreCase))
+            {
+                switch (colName)
+                {
+                    case "Начало смены":
+                    case "Окончание смены":
+                        return new DateTimePicker
+                        {
+                            Tag = colName,
+                            Name = colName,
+                            Location = new Point(10, 25),
+                            Width = parent.Width - 20,
+                            Format = DateTimePickerFormat.Custom,
+                            CustomFormat = "HH:mm",
+                            ShowUpDown = true,
+                            Value = DateTime.Today.Date.AddHours(8) // Устанавливаем 8:00 по умолчанию
+                        };
+                    case "Длительность смены":
+                        return new NumericUpDown
+                        {
+                            Tag = colName,
+                            Name = colName,
+                            Location = new Point(10, 25),
+                            Width = parent.Width - 20,
+                            Minimum = 0,
+                            Maximum = 24
+                        };
+                }
+            }
+
             return dataType switch
             {
                 OleDbType.Integer => new NumericUpDown
@@ -240,6 +288,45 @@ namespace ShiftSchedule
                 }
             };
         }
+        private ComboBox CreateComboBoxControl(string colName, GroupBox parent,
+                                             string lookupTable, string idColumn, string nameColumn)
+        {
+            var combo = new ComboBox
+            {
+                Tag = colName,
+                Name = colName,
+                Location = new Point(10, 25),
+                Width = parent.Width - 20,
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+
+            try
+            {
+                var lookupData = _businessLogic.GetLookupData(lookupTable, idColumn, nameColumn);
+
+                foreach (var item in lookupData)
+                {
+                    combo.Items.Add(new KeyValuePair<int, string>(item.Key, item.Value));
+                }
+
+                combo.DisplayMember = "Value";
+                combo.ValueMember = "Key";
+
+                if (combo.Items.Count > 0)
+                {
+                    combo.SelectedIndex = 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка загрузки данных для {colName}: {ex.Message}",
+                              "Ошибка",
+                              MessageBoxButtons.OK,
+                              MessageBoxIcon.Warning);
+            }
+
+            return combo;
+        }
 
         /// <summary>
         /// Обработчик события нажатия кнопки "Сохранить".
@@ -255,7 +342,8 @@ namespace ShiftSchedule
                 c is TextBox ||
                 c is NumericUpDown ||
                 c is DateTimePicker ||
-                c is CheckBox).ToList();
+                c is CheckBox ||
+                c is ComboBox).ToList();
 
             foreach (var control in inputFields) // Используем отфильтрованный список
             {
@@ -308,14 +396,35 @@ namespace ShiftSchedule
         /// <returns>Значение, полученное из элемента управления.</returns>
         private object GetControlValue(Control control)
         {
-            return control switch
+            switch (control)
             {
-                TextBox tb => tb.Text,
-                NumericUpDown num => Convert.ToInt32(num.Value),
-                DateTimePicker dt => dt.Value,
-                CheckBox cb => cb.Checked,
-                _ => null
-            };
+                case ComboBox cb:
+                    if (cb.SelectedItem == null) return null;
+                    if (cb.SelectedItem is KeyValuePair<int, string> kvp)
+                        return kvp.Key;
+                    return cb.SelectedValue ?? cb.SelectedItem;
+
+                case TextBox tb:
+                    return tb.Text;
+
+                case NumericUpDown num:
+                    return Convert.ToInt32(num.Value);
+
+                case DateTimePicker dt:
+                    if (_tableName.Equals("Длительности смен", StringComparison.OrdinalIgnoreCase) &&
+                        (dt.Tag.ToString() == "Начало смены" || dt.Tag.ToString() == "Окончание смены"))
+                    {
+                        // Для времени возвращаем DateTime с фиксированной датой (например, 30.12.1999) и выбранным временем
+                        return new DateTime(1999, 12, 30, dt.Value.Hour, dt.Value.Minute, 0);
+                    }
+                    return dt.Value;
+
+                case CheckBox cb:
+                    return cb.Checked;
+
+                default:
+                    return null;
+            }
         }
 
         /// <summary>
@@ -325,12 +434,18 @@ namespace ShiftSchedule
         /// <returns>True, если значение пустое, иначе False.</returns>
         private bool IsValueEmpty(object value)
         {
+            if (value == null || value == DBNull.Value)
+                return true;
+
+            if (value is TimeSpan timeSpan)
+                return timeSpan == TimeSpan.Zero;
+
             return value switch
             {
                 string s => string.IsNullOrWhiteSpace(s),
                 decimal d => d == 0,
                 DateTime dt => dt == DateTime.MinValue,
-                _ => value == null
+                _ => false
             };
         }
     }

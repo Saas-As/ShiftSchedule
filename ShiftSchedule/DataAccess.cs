@@ -168,56 +168,49 @@ namespace ShiftSchedule
         /// <param name="idColumnName">Имя колонки с ID</param>
         /// <exception cref="Exception">Ошибка</exception>
 
-        public void UpdateRecord(string tableName, Dictionary<string, object> values, string idColumnName)
+        public bool UpdateRecord(string tableName, Dictionary<string, object> values, string idColumnName)
         {
             using (var conn = new OleDbConnection(_connectionString))
             {
                 conn.Open();
-                // транзакция
                 using (var transaction = conn.BeginTransaction())
                 {
                     try
                     {
-                        // список для SET-части запроса (все поля кроме ID)
                         var setParts = new List<string>();
-                        // Список параметров для безопасной подстановки значений
                         var parameters = new List<OleDbParameter>();
+                        object idValue = null;
 
-                        // Формируем SET-часть и параметры для всех полей, кроме ID
                         foreach (var item in values)
                         {
-                            if (item.Key != idColumnName)
+                            if (item.Key.Equals(idColumnName, StringComparison.OrdinalIgnoreCase))
                             {
-                                // Добавляем часть SET
-                                setParts.Add($"[{item.Key}] = ?");
-                                // Создаем параметр с значением
-                                parameters.Add(new OleDbParameter($"@{item.Key}", item.Value ?? DBNull.Value));
+                                idValue = item.Value;
+                                continue;
                             }
+
+                            setParts.Add($"[{item.Key}] = ?");
+                            parameters.Add(new OleDbParameter($"@{item.Key}", item.Value ?? DBNull.Value));
                         }
 
-                        // Добавляем параметр для WHERE условия
-                        parameters.Add(new OleDbParameter($"@{idColumnName}", values[idColumnName]));
+                        if (idValue == null)
+                            throw new Exception("Не найдено значение ID для обновления");
 
-                        // Собираем полный запрос
+                        parameters.Add(new OleDbParameter($"@{idColumnName}", idValue));
+
                         string query = $"UPDATE [{tableName}] SET {string.Join(", ", setParts)} " +
                                       $"WHERE [{idColumnName}] = ?";
-                        // Создаем команду с запросом, соединением и транзакцией
+
                         var cmd = new OleDbCommand(query, conn, transaction);
-                        // Добавляем все параметры в команду
                         cmd.Parameters.AddRange(parameters.ToArray());
-                        // Выполнение запроса
+
                         int affectedRows = cmd.ExecuteNonQuery();
-                        // Проверка, была ли обновлена запись
-                        if (affectedRows == 0)
-                        {
-                            throw new Exception("Не была обновлена ни одна запись. Возможно, запись не существует.");
-                        }
-                        // если все успешно - подтверждаем транзакцию
                         transaction.Commit();
+
+                        return affectedRows > 0;
                     }
                     catch (Exception ex)
                     {
-                        // Откатываем транзакцию в случае ошибки
                         transaction.Rollback();
                         throw new Exception($"Ошибка при обновлении записи: {ex.Message}");
                     }

@@ -138,9 +138,6 @@ namespace ShiftSchedule
 
                 // активируем ComboBox
                 cmdChooseTable.Enabled = true;
-                addRecordButton.Enabled = true;
-                editRecordButton.Enabled = true;
-                deleteRecordButton.Enabled = true;
                 Reportbutton.Enabled = true;
             }
             // Обработка ошибки подключения
@@ -184,6 +181,10 @@ namespace ShiftSchedule
         /// </summary>
         private void LoadData()
         {
+            addRecordButton.Enabled = true;
+            editRecordButton.Enabled = true;
+            deleteRecordButton.Enabled = true;
+
             // Если не выбрана таблица - выходим из метода
             if (cmdChooseTable.SelectedItem == null) return;
 
@@ -192,18 +193,26 @@ namespace ShiftSchedule
 
             try
             {
-                connection.Open();
+                if (selectedTable.Equals("Смены", StringComparison.OrdinalIgnoreCase))
+                {
+                    LoadShiftsDataWithNames();
+                }
+                else
+                {
+                    connection.Open();
 
-                // Создаем SQL-запрос
-                OleDbCommand command = new OleDbCommand($"SELECT * FROM [{selectedTable}]", connection);
+                    // Создаем SQL-запрос
+                    OleDbCommand command = new OleDbCommand($"SELECT * FROM [{selectedTable}]", connection);
 
-                // Используем адаптер для заполнения DataTable
-                OleDbDataAdapter adapter = new OleDbDataAdapter(command);
-                DataTable dataTable = new DataTable();
-                adapter.Fill(dataTable);
+                    // Используем адаптер для заполнения DataTable
+                    OleDbDataAdapter adapter = new OleDbDataAdapter(command);
+                    DataTable dataTable = new DataTable();
+                    adapter.Fill(dataTable);
 
-                // Привязываем DataTable к DataGridView
-                dataGridView1.DataSource = dataTable;
+                    // Привязываем DataTable к DataGridView
+                    dataGridView1.DataSource = dataTable;
+                }
+                    
             }
             // Обработчик ошибок
             catch (Exception ex)
@@ -214,6 +223,59 @@ namespace ShiftSchedule
             finally
             {
                 // Закрытие соединения
+                if (connection.State == ConnectionState.Open)
+                {
+                    connection.Close();
+                }
+            }
+        }
+        private void LoadShiftsDataWithNames()
+        {
+            string query = @"SELECT 
+                            s.[Код смены], 
+                            s.[Дата],
+                            s.[ID_подразделения],
+                            p.[Подразделение] AS [Подразделение_текст],
+                            s.[ID_руководителя],
+                            r.[ФИО_руководителя] AS [Руководитель_текст],
+                            s.[ID_начальника_смены],
+                            n.[ФИО_начальника_смены] AS [Начальник_текст],
+                            s.[ID_количества_рабочих],
+                            k.[Количество рабочих] AS [Количество_текст],
+                            s.[ID_длительности_смены],
+                            d.[Длительность смены] AS [Длительность_текст]
+                        FROM (((([Смены] s
+                        LEFT JOIN [Подразделения] p ON s.[ID_подразделения] = p.[ID_подразделения])
+                        LEFT JOIN [Руководители] r ON s.[ID_руководителя] = r.[ID_руководителя])
+                        LEFT JOIN [Начальники смен] n ON s.[ID_начальника_смены] = n.[ID_начальника_смены])
+                        LEFT JOIN [Количество рабочих] k ON s.[ID_количества_рабочих] = k.[ID_количества_рабочих])
+                        LEFT JOIN [Длительности смен] d ON s.[ID_длительности_смены] = d.[ID_длительности_смены]";
+
+            try
+            {
+                connection.Open();
+                OleDbCommand command = new OleDbCommand(query, connection);
+                OleDbDataAdapter adapter = new OleDbDataAdapter(command);
+                DataTable dataTable = new DataTable();
+                adapter.Fill(dataTable);
+                dataGridView1.DataSource = dataTable;
+
+                // Скрываем технические ID-столбцы
+                dataGridView1.Columns["ID_подразделения"].Visible = false;
+                dataGridView1.Columns["ID_руководителя"].Visible = false;
+                dataGridView1.Columns["ID_начальника_смены"].Visible = false;
+                dataGridView1.Columns["ID_количества_рабочих"].Visible = false;
+                dataGridView1.Columns["ID_длительности_смены"].Visible = false;
+
+                // Переименовываем текстовые столбцы для красивого отображения
+                dataGridView1.Columns["Подразделение_текст"].HeaderText = "Подразделение";
+                dataGridView1.Columns["Руководитель_текст"].HeaderText = "Руководитель";
+                dataGridView1.Columns["Начальник_текст"].HeaderText = "Начальник смены";
+                dataGridView1.Columns["Количество_текст"].HeaderText = "Количество рабочих";
+                dataGridView1.Columns["Длительность_текст"].HeaderText = "Длительность смены";
+            }
+            finally
+            {
                 if (connection.State == ConnectionState.Open)
                 {
                     connection.Close();
@@ -291,6 +353,10 @@ namespace ShiftSchedule
             foreach (DataGridViewCell cell in selectedRow.Cells)
             {
                 string columnName = dataGridView1.Columns[cell.ColumnIndex].Name;
+
+                // Если это текстовый столбец, пропускаем - нас интересуют только ID
+                if (columnName.EndsWith("_текст")) continue;
+
                 values[columnName] = cell.Value;
             }
 
