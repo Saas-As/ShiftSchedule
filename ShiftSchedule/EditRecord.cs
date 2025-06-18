@@ -480,7 +480,7 @@ namespace ShiftSchedule
                     object value = GetControlValue(control);
 
                     // Проверка обязательных полей
-                    if (isRequired && IsValueEmpty(value))
+                    if (isRequired || IsValueEmpty(value))
                     {
                         missingFields.Add(fieldName);
                         control.BackColor = Color.LightPink; // Подсвечиваем поле с ошибкой

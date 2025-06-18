@@ -60,17 +60,147 @@ namespace ShiftSchedule
             {
                 case "Смены по дате":
                     AddDateCriteriaControls(); // Добавляем элементы для выбора дат
+                    AddOptionalDepartmentControls(120);
                     break;
                 case "Смены по подразделению":
                     AddDepartmentCriteriaControls(); // Добавляем выпадающий список подразделений
+                    AddOptionalDateControls(120);
                     break;
                 case "Смены по начальнику смены":
                     AddShiftManagerCriteriaControls();  // Добавляем выпадающий список начальников
+                    AddOptionalDateControls(120);
                     break;
                 case "Сводный отчет за период":
                     AddSummaryCriteriaControls(); // Добавляем элементы для выбора месяца и года
+                    AddOptionalDateControls(120);
                     break;
             }
+        }
+        /// <summary>
+        /// Добавляет необязательный фильтр по дате
+        /// </summary>
+        /// <param name="topPosition">верхняя позиция</param>
+        private void AddOptionalDateControls(int topPosition)
+        {
+            // Чекбокс для активации фильтра по дате
+            var chkUseDates = new System.Windows.Forms.CheckBox
+            {
+                Name = "chkUseDates",
+                Text = "Фильтровать по дате",
+                Location = new System.Drawing.Point(10, topPosition),
+                AutoSize = true
+            };
+            chkUseDates.CheckedChanged += (s, e) =>
+            {
+                var chk = s as System.Windows.Forms.CheckBox;
+                var dtpFrom = pnlCriteria.Controls.Find("dtpOptFrom", true).FirstOrDefault() as DateTimePicker;
+                var dtpTo = pnlCriteria.Controls.Find("dtpOptTo", true).FirstOrDefault() as DateTimePicker;
+                var lblFrom = pnlCriteria.Controls.Find("lblOptFrom", true).FirstOrDefault() as System.Windows.Forms.Label;
+                var lblTo = pnlCriteria.Controls.Find("lblOptTo", true).FirstOrDefault() as System.Windows.Forms.Label;
+
+                if (dtpFrom != null && dtpTo != null && lblFrom != null && lblTo != null)
+                {
+                    dtpFrom.Enabled = chk.Checked;
+                    dtpTo.Enabled = chk.Checked;
+                    lblFrom.Enabled = chk.Checked;
+                    lblTo.Enabled = chk.Checked;
+                }
+            };
+
+            // Метка "С:"
+            var lblFrom = new System.Windows.Forms.Label
+            {
+                Name = "lblOptFrom",
+                Text = "С:",
+                Location = new System.Drawing.Point(10, topPosition + 30),
+                AutoSize = true,
+                Enabled = false
+            };
+
+            // Поле выбора начальной даты
+            var dtpFrom = new DateTimePicker
+            {
+                Name = "dtpOptFrom",
+                Location = new System.Drawing.Point(40, topPosition + 30),
+                Format = DateTimePickerFormat.Short,
+                Width = 120,
+                Value = DateTime.Today,
+                Enabled = false
+            };
+
+            // Метка "По:"
+            var lblTo = new System.Windows.Forms.Label
+            {
+                Name = "lblOptTo",
+                Text = "По:",
+                Location = new System.Drawing.Point(10, topPosition + 70),
+                AutoSize = true,
+                Enabled = false
+            };
+
+            // Поле выбора конечной даты
+            var dtpTo = new DateTimePicker
+            {
+                Name = "dtpOptTo",
+                Location = new System.Drawing.Point(40, topPosition + 70),
+                Format = DateTimePickerFormat.Short,
+                Width = 120,
+                Value = DateTime.Today.AddDays(7),
+                Enabled = false
+            };
+
+            pnlCriteria.Controls.AddRange(new Control[] { chkUseDates, lblFrom, dtpFrom, lblTo, dtpTo });
+        }
+        /// <summary>
+        /// Добавляет необязательный фильтр по подразделению
+        /// </summary>
+        /// <param name="topPosition">Верхняя позиция</param>
+        private void AddOptionalDepartmentControls(int topPosition)
+        {
+            // Чекбокс для активации фильтра по подразделению
+            var chkUseDepartment = new System.Windows.Forms.CheckBox
+            {
+                Name = "chkUseDepartment",
+                Text = "Фильтровать по подразделению",
+                Location = new System.Drawing.Point(10, topPosition),
+                AutoSize = true
+            };
+
+            // Метка "Подразделение:"
+            var lblDept = new System.Windows.Forms.Label
+            {
+                Name = "lblOptDept",
+                Text = "Подразделение:",
+                Location = new System.Drawing.Point(10, topPosition + 30),
+                AutoSize = true,
+                Enabled = false
+            };
+
+            // Выпадающий список подразделений
+            var cmbDept = new ComboBox
+            {
+                Name = "cmbOptDept",
+                Location = new System.Drawing.Point(120, topPosition + 30),
+                Width = 200,
+                Enabled = false
+            };
+
+            // Заполняем список подразделений
+            var depts = _businessLogic.GetTableData("Подразделения");
+            foreach (DataRow row in depts.Rows)
+            {
+                cmbDept.Items.Add(row["Подразделение"].ToString());
+            }
+
+            // Обработчик изменения состояния чекбокса
+            chkUseDepartment.CheckedChanged += (s, e) =>
+            {
+                var chk = s as System.Windows.Forms.CheckBox;
+                cmbDept.Enabled = chk.Checked;
+                lblDept.Enabled = chk.Checked;
+            };
+
+            pnlCriteria.Controls.AddRange(new Control[] { chkUseDepartment, lblDept, cmbDept });
         }
 
         /// <summary>
@@ -118,6 +248,7 @@ namespace ShiftSchedule
             // Добавляем все элементы на панель
             pnlCriteria.Controls.AddRange(new Control[] { lblFrom, dtpFrom, lblTo, dtpTo });
         }
+       
 
         /// <summary>
         /// Добавляет выпадающий список для выбора подразделения.
@@ -292,6 +423,8 @@ namespace ShiftSchedule
             // Находим элементы управления для выбора дат на панели
             var dtpFrom = pnlCriteria.Controls.Find("dtpFrom", true).FirstOrDefault() as DateTimePicker;
             var dtpTo = pnlCriteria.Controls.Find("dtpTo", true).FirstOrDefault() as DateTimePicker;
+            var chkUseDepartment = pnlCriteria.Controls.Find("chkUseDepartment", true).FirstOrDefault() as System.Windows.Forms.CheckBox;
+            var cmbDept = pnlCriteria.Controls.Find("cmbOptDept", true).FirstOrDefault() as ComboBox;
 
             // Проверяем, что элементы найдены
             if (dtpFrom == null || dtpTo == null)
@@ -326,8 +459,15 @@ namespace ShiftSchedule
                     LEFT JOIN [Начальники смен] n ON s.[ID_начальника_смены] = n.[ID_начальника_смены])
                     LEFT JOIN [Количество рабочих] k ON s.[ID_количества_рабочих] = k.[ID_количества_рабочих])
                     LEFT JOIN [Длительности смен] d ON s.[ID_длительности_смены] = d.[ID_длительности_смены]
-                    WHERE s.[Дата] BETWEEN CDate('{fromDate}') AND CDate('{toDate}')
-                    ORDER BY s.[Дата]";
+                    WHERE s.[Дата] BETWEEN CDate('{fromDate}') AND CDate('{toDate}')";
+
+            // Добавляем условие по подразделению, если чекбокс отмечен и подразделение выбрано
+            if (chkUseDepartment != null && chkUseDepartment.Checked && cmbDept != null && cmbDept.SelectedItem != null)
+            {
+                    query += $" AND p.[Подразделение] = '{cmbDept.SelectedItem}'";
+            }
+
+            query += " ORDER BY s.[Дата]";
 
             // Выполняем запрос через бизнес-логику и возвращаем результат
             return _businessLogic.ExecuteCustomQuery(query);
@@ -341,31 +481,50 @@ namespace ShiftSchedule
         {
             // Находим выпадающий список подразделений на панели
             var cmbDept = pnlCriteria.Controls.Find("cmbDept", true).FirstOrDefault() as ComboBox;
+            var chkUseDates = pnlCriteria.Controls.Find("chkUseDates", true).FirstOrDefault() as System.Windows.Forms.CheckBox;
+            var dtpFrom = pnlCriteria.Controls.Find("dtpOptFrom", true).FirstOrDefault() as DateTimePicker;
+            var dtpTo = pnlCriteria.Controls.Find("dtpOptTo", true).FirstOrDefault() as DateTimePicker;
 
-            // Проверяем, что элемент найден и выбран элемент
             if (cmbDept == null || cmbDept.SelectedItem == null)
             {
                 MessageBox.Show("Выберите подразделение");
                 return null;
             }
 
+
             // Формируем SQL-запрос для выбранного подразделения
             string query = $@"SELECT 
-                                s.[Код смены], 
-                                s.[Дата],
-                                p.[Подразделение],
-                                r.[ФИО_руководителя],
-                                n.[ФИО_начальника_смены],
-                                k.[Количество рабочих],
-                                d.[Длительность смены]
-                                FROM (((([Смены] s
-                                LEFT JOIN [Подразделения] p ON s.[ID_подразделения] = p.[ID_подразделения])
-                                LEFT JOIN [Руководители] r ON s.[ID_руководителя] = r.[ID_руководителя])
-                                LEFT JOIN [Начальники смен] n ON s.[ID_начальника_смены] = n.[ID_начальника_смены])
-                                LEFT JOIN [Количество рабочих] k ON s.[ID_количества_рабочих] = k.[ID_количества_рабочих])
-                                LEFT JOIN [Длительности смен] d ON s.[ID_длительности_смены] = d.[ID_длительности_смены]
-                                WHERE p.[Подразделение] = '{cmbDept.SelectedItem}'
-                                ORDER BY  s.[Дата]";
+                    s.[Код смены], 
+                    s.[Дата],
+                    p.[Подразделение],
+                    r.[ФИО_руководителя],
+                    n.[ФИО_начальника_смены],
+                    k.[Количество рабочих],
+                    d.[Длительность смены]
+                    FROM (((([Смены] s
+                    LEFT JOIN [Подразделения] p ON s.[ID_подразделения] = p.[ID_подразделения])
+                    LEFT JOIN [Руководители] r ON s.[ID_руководителя] = r.[ID_руководителя])
+                    LEFT JOIN [Начальники смен] n ON s.[ID_начальника_смены] = n.[ID_начальника_смены])
+                    LEFT JOIN [Количество рабочих] k ON s.[ID_количества_рабочих] = k.[ID_количества_рабочих])
+                    LEFT JOIN [Длительности смен] d ON s.[ID_длительности_смены] = d.[ID_длительности_смены]
+                    WHERE p.[Подразделение] = '{cmbDept.SelectedItem}'";
+
+            // Добавляем условие по дате, если чекбокс отмечен
+            if (chkUseDates != null && chkUseDates.Checked && dtpFrom != null && dtpTo != null)
+            {
+                if (dtpFrom.Value > dtpTo.Value)
+                {
+                    MessageBox.Show("Дата 'С' не может быть позже даты 'По'");
+                    return null;
+                }
+
+                string fromDate = dtpFrom.Value.ToString("dd.MM.yyyy");
+                string toDate = dtpTo.Value.ToString("dd.MM.yyyy");
+                query += $" AND s.[Дата] BETWEEN CDate('{fromDate}') AND CDate('{toDate}')";
+            }
+
+            // Добавляем сортировку в конце запроса
+            query += " ORDER BY s.[Дата]";
 
             // Выполняем запрос через бизнес-логику и возвращаем результат
             return _businessLogic.ExecuteCustomQuery(query);
@@ -379,6 +538,9 @@ namespace ShiftSchedule
         {
             // Находим выпадающий список начальников на панели
             var cmbManager = pnlCriteria.Controls.Find("cmbManager", true).FirstOrDefault() as ComboBox;
+            var chkUseDates = pnlCriteria.Controls.Find("chkUseDates", true).FirstOrDefault() as System.Windows.Forms.CheckBox;
+            var dtpFrom = pnlCriteria.Controls.Find("dtpOptFrom", true).FirstOrDefault() as DateTimePicker;
+            var dtpTo = pnlCriteria.Controls.Find("dtpOptTo", true).FirstOrDefault() as DateTimePicker;
 
             // Проверяем, что элемент найден и выбран элемент
             if (cmbManager == null || cmbManager.SelectedItem == null)
@@ -402,8 +564,23 @@ namespace ShiftSchedule
                             LEFT JOIN [Начальники смен] n ON s.[ID_начальника_смены] = n.[ID_начальника_смены])
                             LEFT JOIN [Количество рабочих] k ON s.[ID_количества_рабочих] = k.[ID_количества_рабочих])
                             LEFT JOIN [Длительности смен] d ON s.[ID_длительности_смены] = d.[ID_длительности_смены]
-                            WHERE n.[ФИО_начальника_смены] = '{cmbManager.SelectedItem}'
-                            ORDER BY  s.[Дата]";
+                            WHERE n.[ФИО_начальника_смены] = '{cmbManager.SelectedItem}'";
+
+            // Добавляем условие по дате, если чекбокс отмечен
+            if (chkUseDates != null && chkUseDates.Checked && dtpFrom != null && dtpTo != null)
+            {
+                if (dtpFrom.Value > dtpTo.Value)
+                {
+                    MessageBox.Show("Дата 'С' не может быть позже даты 'По'");
+                    return null;
+                }
+
+                string fromDate = dtpFrom.Value.ToString("dd.MM.yyyy");
+                string toDate = dtpTo.Value.ToString("dd.MM.yyyy");
+                query += $" AND s.[Дата] BETWEEN CDate('{fromDate}') AND CDate('{toDate}')";
+            }
+
+            query += " ORDER BY s.[Дата]";
 
             // Выполняем запрос через бизнес-логику и возвращаем результат
             return _businessLogic.ExecuteCustomQuery(query);
@@ -418,6 +595,9 @@ namespace ShiftSchedule
             // Находим элементы выбора месяца и года на панели
             var cmbMonth = pnlCriteria.Controls.Find("cmbMonth", true).FirstOrDefault() as ComboBox;
             var numYear = pnlCriteria.Controls.Find("numYear", true).FirstOrDefault() as NumericUpDown;
+            var chkUseDates = pnlCriteria.Controls.Find("chkUseDates", true).FirstOrDefault() as System.Windows.Forms.CheckBox;
+            var dtpFrom = pnlCriteria.Controls.Find("dtpOptFrom", true).FirstOrDefault() as DateTimePicker;
+            var dtpTo = pnlCriteria.Controls.Find("dtpOptTo", true).FirstOrDefault() as DateTimePicker;
 
             // Проверяем, что элементы найдены и месяц выбран
             if (cmbMonth == null || numYear == null || cmbMonth.SelectedIndex == -1)
@@ -440,8 +620,23 @@ namespace ShiftSchedule
                             LEFT JOIN [Подразделения] p ON s.[ID_подразделения] = p.[ID_подразделения])
                             LEFT JOIN [Количество рабочих] k ON s.[ID_количества_рабочих] = k.[ID_количества_рабочих])
                             LEFT JOIN [Длительности смен] d ON s.[ID_длительности_смены] = d.[ID_длительности_смены]
-                            WHERE MONTH(s.[Дата]) = {month} AND YEAR(s.[Дата]) = {year}
-                            GROUP BY p.[Подразделение]";
+                            WHERE MONTH(s.[Дата]) = {month} AND YEAR(s.[Дата]) = {year}";
+
+            // Добавляем условие по дате, если чекбокс отмечен
+            if (chkUseDates != null && chkUseDates.Checked && dtpFrom != null && dtpTo != null)
+            {
+                if (dtpFrom.Value > dtpTo.Value)
+                {
+                    MessageBox.Show("Дата 'С' не может быть позже даты 'По'");
+                    return null;
+                }
+
+                string fromDate = dtpFrom.Value.ToString("dd.MM.yyyy");
+                string toDate = dtpTo.Value.ToString("dd.MM.yyyy");
+                query += $" AND s.[Дата] BETWEEN CDate('{fromDate}') AND CDate('{toDate}')";
+            }
+
+            query += " GROUP BY p.[Подразделение]";
 
             // Выполняем запрос через бизнес-логику и возвращаем результат
             return _businessLogic.ExecuteCustomQuery(query);

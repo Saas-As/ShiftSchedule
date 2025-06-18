@@ -35,7 +35,7 @@ namespace ShiftSchedule
         }
         /// <summary>
         /// Получает схему указанной таблицы из базы данных.
-        /// Фильтрует системные таблицы и таблицу Users.
+        /// Фильтрует системные таблицы.
         /// </summary>
         /// <param name="tableName">название таблицы</param>
         /// <returns>DataTable с информацией о схеме таблицы</returns>

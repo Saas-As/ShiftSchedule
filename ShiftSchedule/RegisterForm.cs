@@ -80,7 +80,8 @@ namespace ShiftSchedule
             // Проверяем, не существует ли уже пользователь с таким логином
             if (_auth.UserExists(txtUsername.Text))
             {
-                MessageBox.Show("Пользователь с таким логином уже существует", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Пользователь с таким логином уже существует", "Ошибка", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 

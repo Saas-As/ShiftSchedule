@@ -117,7 +117,7 @@
             this.Controls.Add(this.label2);
             this.Controls.Add(this.label1);
             this.Name = "LoginForm";
-            this.Text = "График смены. Аутентификация";
+            this.Text = "График смены. Авторизация";
             this.ResumeLayout(false);
             this.PerformLayout();
 
